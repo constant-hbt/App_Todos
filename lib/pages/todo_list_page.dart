@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todo_list/Repositories/todo_repository.dart';
 import 'package:todo_list/models/todo.dart';
 
 import 'package:todo_list/widgets/todo_list_item.dart';
@@ -12,7 +13,9 @@ class TodoListPage extends StatefulWidget {
 
 class _TodoListPageState extends State<TodoListPage> {
   final TextEditingController todoContoller = TextEditingController();
+  final TodoRepository todoRepository = TodoRepository();
 
+  String? errorMsg;
   List<Todo> todos = [];
   int last = 0;
   Todo? deletedTodo;
@@ -25,6 +28,8 @@ class _TodoListPageState extends State<TodoListPage> {
     setState(() {
       todos.remove(todo);
     });
+
+    todoRepository.saveTodoList(todos);
 
     ScaffoldMessenger.of(context).clearSnackBars();
 
@@ -41,6 +46,7 @@ class _TodoListPageState extends State<TodoListPage> {
           setState(() {
             todos.insert(deletedTodoPos!, deletedTodo!);
           });
+          todoRepository.saveTodoList(todos);
         },
       ),
       duration: const Duration(seconds: 5),
@@ -52,14 +58,16 @@ class _TodoListPageState extends State<TodoListPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Limpar Tudo?'),
-        content: const Text('Você tem certeza que deseja apagar todas as tarefas?'),
+        content:
+            const Text('Você tem certeza que deseja apagar todas as tarefas?'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
             },
             child: Text('Cancelar'),
-            style: TextButton.styleFrom(foregroundColor: const Color(0xff00d7f3)),
+            style:
+                TextButton.styleFrom(foregroundColor: const Color(0xff00d7f3)),
           ),
           TextButton(
             onPressed: () {
@@ -74,9 +82,22 @@ class _TodoListPageState extends State<TodoListPage> {
     );
   }
 
-  void deleteAllTodos(){
+  void deleteAllTodos() {
     setState(() {
       todos.clear();
+    });
+
+    todoRepository.saveTodoList(todos);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    todoRepository.getTodoList().then((value) {
+      setState(() {
+        todos = value;
+      });
     });
   }
 
@@ -95,10 +116,20 @@ class _TodoListPageState extends State<TodoListPage> {
                     Expanded(
                       child: TextField(
                         controller: todoContoller,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
                           labelText: 'Adicione uma tarefa',
                           hintText: 'Ex. Estudar Flutter',
+                          errorText: errorMsg,
+                          focusedBorder: const OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Color(0xff00d7f3),
+                              width: 2,
+                            ),
+                          ),
+                          labelStyle: const TextStyle(
+                            color: Color(0xff00d7f3),
+                          ),
                         ),
                       ),
                     ),
@@ -108,7 +139,14 @@ class _TodoListPageState extends State<TodoListPage> {
                     ElevatedButton(
                       onPressed: () {
                         String text = todoContoller.text;
-                        todoContoller.clear();
+
+                        if (text.isEmpty) {
+                          setState(() {
+                            errorMsg = 'O título não pode ser vazio!';
+                          });
+                          return;
+                        }
+
                         setState(() {
                           Todo newTodo = Todo(
                               id: last + 1,
@@ -116,7 +154,10 @@ class _TodoListPageState extends State<TodoListPage> {
                               dateTime: DateTime.now());
                           last++;
                           todos.add(newTodo);
+                          errorMsg = null;
                         });
+                        todoContoller.clear();
+                        todoRepository.saveTodoList(todos);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xff00d7f3),
